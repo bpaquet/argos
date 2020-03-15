@@ -1,5 +1,6 @@
 import { Model, mergeSchemas, timestampsSchema, jobModelSchema } from '../util'
 import { User } from './User'
+import { Installation } from './Installation'
 
 export class Synchronization extends Model {
   static get tableName() {
@@ -8,12 +9,13 @@ export class Synchronization extends Model {
 
   static get jsonSchema() {
     return mergeSchemas(timestampsSchema, jobModelSchema, {
-      required: ['userId', 'type'],
+      required: ['type'],
       properties: {
         userId: { type: 'string' },
+        installationId: { type: 'string' },
         type: {
           type: 'string',
-          enum: ['github'],
+          enum: ['installation', 'user'],
         },
       },
     })
@@ -21,6 +23,14 @@ export class Synchronization extends Model {
 
   static get relationMappings() {
     return {
+      installation: {
+        relation: Model.BelongsToOneRelation,
+        modelClass: Installation,
+        join: {
+          from: 'synchronizations.installationId',
+          to: 'installations.id',
+        },
+      },
       user: {
         relation: Model.BelongsToOneRelation,
         modelClass: User,

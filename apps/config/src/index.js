@@ -143,13 +143,6 @@ const config = convict({
     },
   },
   pg: {
-    migrations: {
-      directory: {
-        doc: 'Migrations directory',
-        format: String,
-        default: path.join(__dirname, '../../database/migrations'),
-      },
-    },
     client: {
       doc: 'Knex client',
       format: String,
