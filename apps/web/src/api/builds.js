@@ -1,5 +1,5 @@
 import { transaction, raw } from '@argos-ci/database'
-import { HttpError, formatters } from 'express-err'
+import { HttpError } from 'express-err'
 import express from 'express'
 import multer from 'multer'
 import multerS3 from 'multer-s3'
@@ -8,10 +8,11 @@ import config from '@argos-ci/config'
 import { Build, Repository, ScreenshotBucket } from '@argos-ci/database/models'
 import { job as buildJob } from '@argos-ci/build'
 import { s3 as getS3 } from '@argos-ci/storage'
-import { getRedisLock } from './redis'
-import { errorHandler } from './middlewares/errorHandler'
+import { getRedisLock } from '../redis'
+import { asyncHandler } from '../util'
 
 const router = new express.Router()
+export default router
 
 const upload = multer({
   storage: multerS3({
@@ -20,24 +21,6 @@ const upload = multer({
     contentType: multerS3.AUTO_CONTENT_TYPE,
   }),
 })
-
-/**
- * Takes a route handling function and returns
- * a function that wraps it in a `try/catch`. Caught
- * exceptions are forwarded to the `next` handler.
- */
-export function errorChecking(routeHandler) {
-  return async (req, res, next) => {
-    try {
-      await routeHandler(req, res, next)
-    } catch (err) {
-      // Handle objection errors
-      const candidates = [err.status, err.statusCode, err.code, 500]
-      err.status = candidates.find(Number.isInteger)
-      next(err)
-    }
-  }
-}
 
 async function createBuild({
   Build,
@@ -95,7 +78,7 @@ async function useExistingBuild({ Build, ScreenshotBucket, data, repository }) {
 router.post(
   '/builds',
   upload.array('screenshots[]', 500),
-  errorChecking(async (req, res) => {
+  asyncHandler(async (req, res) => {
     const data = JSON.parse(req.body.data)
 
     if (!data.token) {
@@ -186,7 +169,7 @@ router.post(
 router.post(
   '/cancel-build',
   bodyParser.json(),
-  errorChecking(async (req, res) => {
+  asyncHandler(async (req, res) => {
     if (!req.body.token) {
       throw new HttpError(401, 'Missing token')
     }
@@ -230,27 +213,3 @@ router.post(
     res.send({ build })
   }),
 )
-
-router.get(
-  '/buckets',
-  errorChecking(async (req, res) => {
-    let query = ScreenshotBucket.query()
-
-    if (req.query.branch) {
-      query = query.where({ branch: req.query.branch })
-    }
-
-    res.send(await query)
-  }),
-)
-
-router.use(
-  errorHandler({
-    formatters: {
-      json: formatters.json,
-      default: formatters.json,
-    },
-  }),
-)
-
-export default router
